@@ -28,7 +28,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[])
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
-	num_particles = 1000;
+	num_particles = 100;
 
 	default_random_engine gen;
 	normal_distribution<double> dist_x(x, std[0]);
@@ -64,7 +64,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 
 	for (int i = 0; i < num_particles; i++)
 	{
-		Particle p = particles[i];
+		Particle &p = particles[i]; // !!! USE reference please
 
 		cout << "prediction input <" << p.id << ">" << p.x << " " << p.y << " " << p.theta << endl;
 
@@ -169,6 +169,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		vector<double> assoc_x; // perception of the landmark postion in map coordinates - x
 		vector<double> assoc_y; //  - y
 
+		vector<double> shortest_dist_lm;
+
 		// for each observation, convert its car coordindates to map coordinates
 		// and find the nearest landmark
 		// store the result in p as association, sense_x, sense_y eventually
@@ -209,6 +211,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			}
 
 			assert(best_land_mark != -1);
+			shortest_dist_lm.push_back(shortest_dist);
 
 			//
 			// if (shortest_dist > sensor_range)
@@ -222,6 +225,14 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			assoc_y.push_back(y_m);
 		}
 		//SetAssociations(p, assoc, assoc_x, assoc_y);
+
+		// debugging
+		cout << "shortest dist to landmarks for all observations: ";
+		for (auto sd : shortest_dist_lm)
+		{
+			cout << sd << " ";
+		}
+		cout << endl;
 
 		// update weights
 		double total_weight = 1.0; // use 1.0 not 0.0 because it will be a production, not addition
