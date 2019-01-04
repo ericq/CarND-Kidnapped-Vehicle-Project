@@ -54,6 +54,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
+	cout << "entering prediction.. " << endl;
 	default_random_engine gen;
 
 	for (int i = 0; i < num_particles; i++)
@@ -73,6 +74,8 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		p.x = dist_nx(gen);
 		p.y = dist_ny(gen);
 		p.theta = dist_ntheta(gen);
+
+		cout << "prediction with normal_dist:" << p.id << ">" << p.x << " " << p.y << " " << p.theta << endl;
 	}
 }
 
@@ -100,11 +103,21 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 
+	cout << "entering updateWeights.. " << endl;
+
+	cout << "print observations: size=" << observations.size() << endl;
+	for (auto ob : observations)
+	{
+		cout << ob.id << " " << ob.x << " " << ob.y << endl;
+	}
+
 	// for convenience - put map into a "map" data structure, key = landmark id
+	cout << "map size = " << map_landmarks.landmark_list.size() << endl;
 	map<int, Map::single_landmark_s> conv_map;
 	for (auto lm : map_landmarks.landmark_list)
 	{
 		conv_map[lm.id_i] = lm;
+		cout << lm.id_i << " " << lm.x_f << " " << lm.y_f << endl;
 	}
 
 	// clear the weigths if it's not empty
@@ -112,6 +125,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 	for (auto p : particles)
 	{
+		cout << " start particle processing: " << p.id << endl;
 		vector<LandmarkObs> predicted;
 		vector<LandmarkObs> observations_cp = observations;
 
@@ -125,6 +139,12 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		// store the result in p as association, sense_x, sense_y eventually
 		for (auto ob : observations_cp)
 		{
+			double dist_before_conv = sqrt(ob.x * ob.x + ob.y * ob.y);
+			if (dist_before_conv > sensor_range)
+			{
+				cout << " the observation distance greater than sensor range: " << dist_before_conv << " skipped." << endl;
+				continue;
+			}
 			// convert observation from car coordinate to map coordinate using homogeneous transformation matrix
 			// to further clarify:
 			// the input observation_cp (input 1) is provided by the vehicle
@@ -143,13 +163,23 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				double diffx = x_m - lm.x_f;
 				double diffy = y_m - lm.y_f;
 				double d = sqrt(diffx * diffx + diffy * diffy);
+
 				if (d < shortest_dist)
 				{
 					shortest_dist = d;
 					best_land_mark = lm.id_i;
 				}
 			}
+
 			assert(best_land_mark != -1);
+
+			//
+			if (shortest_dist > sensor_range)
+			{
+				cout << "shortest_dist to best landmark greater than sensor range : " << shortest_dist << "skip this observation" << endl;
+				continue;
+			}
+
 			assoc.push_back(best_land_mark);
 			assoc_x.push_back(x_m);
 			assoc_y.push_back(y_m);
@@ -178,33 +208,57 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			//calculate weight using normalization terms and exponent
 			double weight = gauss_norm * exp(-exponent);
 
+			if (weight == 0)
+			{
+				cout << "gauss_norm = " << gauss_norm << " exponent=" << exponent << " weight=" << weight << endl;
+
+				cout << sig_x << " " << sig_y << " " << x_obs << " " << y_obs << " " << mu_x << " " << mu_y << endl;
+
+				//assert(false);
+			}
+
 			// update total weight
 			total_weight *= weight;
 		}
 
 		p.weight = total_weight;
 		weights.push_back(total_weight);
+		cout << "total weight:" << total_weight << endl;
 	}
+
+	assert(weights.size() == num_particles);
 }
 
 void ParticleFilter::resample()
 {
-	// TODO: Resample particles with replacement with probability proportional to their weight.
+	// DONE: Resample particles with replacement with probability proportional to their weight.
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
+
+	cout << "entering resample.. " << endl;
+	cout << "weights=";
+	for (auto w : weights)
+	{
+		cout << w << " ";
+	}
+	cout << endl;
 
 	random_device rd;
 	mt19937 gen(rd());
 	discrete_distribution<> dd(weights.begin(), weights.end());
 	vector<Particle> resampled;
 
+	cout << "start to pick: ";
 	for (int i = 0; i < num_particles; i++)
 	{
 		int picked_pid = dd(gen);
+		cout << " " << picked_pid;
 		resampled.push_back(particles[picked_pid]);
 	}
+	cout << endl;
 
 	particles = resampled;
+	// TODO - may need to reset weights?
 }
 
 Particle ParticleFilter::SetAssociations(Particle &particle, const std::vector<int> &associations,
@@ -218,6 +272,8 @@ Particle ParticleFilter::SetAssociations(Particle &particle, const std::vector<i
 	particle.associations = associations;
 	particle.sense_x = sense_x;
 	particle.sense_y = sense_y;
+
+	return particle;
 }
 
 string ParticleFilter::getAssociations(Particle best)
