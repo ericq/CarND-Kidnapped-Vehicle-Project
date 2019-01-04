@@ -28,7 +28,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[])
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
-	num_particles = 20;
+	num_particles = 1000;
 
 	default_random_engine gen;
 	normal_distribution<double> dist_x(x, std[0]);
@@ -54,22 +54,57 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
-	cout << "entering prediction.. " << endl;
+	cout << "entering prediction.. delta_t=" << delta_t << " std_pos=" << std_pos[0] << "," << std_pos[1]
+		 << " velocity=" << velocity << " yaw_rate=" << yaw_rate << endl;
 	default_random_engine gen;
+
+	// because the particle may occur multiple times, we store the particle's normal_distribution generator
+	// in this way, we don't need to predict the nx, ny, ntheta again
+	map<int, vector<normal_distribution<double>>> particle_seen;
 
 	for (int i = 0; i < num_particles; i++)
 	{
 		Particle p = particles[i];
 
-		double nx = p.x + velocity * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta)) / yaw_rate;
-		double ny = p.y + velocity * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t)) / yaw_rate;
-		double ntheta = p.theta + yaw_rate * delta_t;
+		cout << "prediction input <" << p.id << ">" << p.x << " " << p.y << " " << p.theta << endl;
 
-		cout << "prediction <" << p.id << ">" << nx << " " << ny << " " << ntheta << endl;
+		normal_distribution<double> dist_nx, dist_ny, dist_ntheta;
 
-		normal_distribution<double> dist_nx(nx, std_pos[0]);
-		normal_distribution<double> dist_ny(ny, std_pos[1]);
-		normal_distribution<double> dist_ntheta(ntheta, std_pos[2]);
+		// check have seen the id or not
+		if (particle_seen.find(p.id) != particle_seen.end())
+		{
+			cout << "have seen this particle before: " << p.id << endl;
+			dist_nx = particle_seen[p.id][0];
+			dist_ny = particle_seen[p.id][1];
+			dist_ntheta = particle_seen[p.id][2];
+		}
+		else
+		{
+			double nx, ny, ntheta;
+
+			if (yaw_rate != 0)
+			{
+				nx = p.x + velocity * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta)) / yaw_rate;
+				ny = p.y + velocity * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t)) / yaw_rate;
+				ntheta = p.theta + yaw_rate * delta_t;
+			}
+			else
+			{
+				cout << "yaw_rate == 0" << endl;
+				nx = p.x + velocity * delta_t * cos(p.theta);
+				ny = p.y + velocity * delta_t * sin(p.theta);
+				ntheta = p.theta;
+			}
+
+			cout << "prediction output <" << p.id << ">" << nx << " " << ny << " " << ntheta << endl;
+
+			dist_nx = normal_distribution<double>(nx, std_pos[0]);
+			dist_ny = normal_distribution<double>(ny, std_pos[1]);
+			dist_ntheta = normal_distribution<double>(ntheta, std_pos[2]);
+
+			cout << "first particle with this id.. stored the nd for future use" << endl;
+			particle_seen[p.id] = {dist_nx, dist_ny, dist_ntheta};
+		}
 
 		p.x = dist_nx(gen);
 		p.y = dist_ny(gen);
@@ -117,7 +152,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	for (auto lm : map_landmarks.landmark_list)
 	{
 		conv_map[lm.id_i] = lm;
-		cout << lm.id_i << " " << lm.x_f << " " << lm.y_f << endl;
+		//cout << lm.id_i << " " << lm.x_f << " " << lm.y_f << endl;
 	}
 
 	// clear the weigths if it's not empty
@@ -139,12 +174,14 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		// store the result in p as association, sense_x, sense_y eventually
 		for (auto ob : observations_cp)
 		{
-			double dist_before_conv = sqrt(ob.x * ob.x + ob.y * ob.y);
-			if (dist_before_conv > sensor_range)
-			{
-				cout << " the observation distance greater than sensor range: " << dist_before_conv << " skipped." << endl;
-				continue;
-			}
+			//
+			// double dist_before_conv = sqrt(ob.x * ob.x + ob.y * ob.y);
+			// if (dist_before_conv > sensor_range)
+			// {
+			// 	cout << " the observation distance greater than sensor range: " << dist_before_conv << " skipped." << endl;
+			// 	continue;
+			// }
+
 			// convert observation from car coordinate to map coordinate using homogeneous transformation matrix
 			// to further clarify:
 			// the input observation_cp (input 1) is provided by the vehicle
@@ -174,17 +211,17 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			assert(best_land_mark != -1);
 
 			//
-			if (shortest_dist > sensor_range)
-			{
-				cout << "shortest_dist to best landmark greater than sensor range : " << shortest_dist << "skip this observation" << endl;
-				continue;
-			}
+			// if (shortest_dist > sensor_range)
+			// {
+			// 	cout << "shortest_dist to best landmark greater than sensor range : " << shortest_dist << "skip this observation" << endl;
+			// 	continue;
+			// }
 
 			assoc.push_back(best_land_mark);
 			assoc_x.push_back(x_m);
 			assoc_y.push_back(y_m);
 		}
-		SetAssociations(p, assoc, assoc_x, assoc_y);
+		//SetAssociations(p, assoc, assoc_x, assoc_y);
 
 		// update weights
 		double total_weight = 1.0; // use 1.0 not 0.0 because it will be a production, not addition
@@ -208,11 +245,11 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			//calculate weight using normalization terms and exponent
 			double weight = gauss_norm * exp(-exponent);
 
-			if (weight == 0)
+			if (true)
 			{
-				cout << "gauss_norm = " << gauss_norm << " exponent=" << exponent << " weight=" << weight << endl;
+				//cout << "gauss_norm = " << gauss_norm << " exponent=" << exponent << " weight=" << weight << endl;
 
-				cout << sig_x << " " << sig_y << " " << x_obs << " " << y_obs << " " << mu_x << " " << mu_y << endl;
+				//cout << sig_x << " " << sig_y << " " << x_obs << " " << y_obs << " " << mu_x << " " << mu_y << endl;
 
 				//assert(false);
 			}
