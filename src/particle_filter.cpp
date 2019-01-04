@@ -28,7 +28,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[])
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
-	num_particles = 100;
+	num_particles = 20;
 
 	default_random_engine gen;
 	normal_distribution<double> dist_x(x, std[0]);
@@ -58,10 +58,6 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		 << " velocity=" << velocity << " yaw_rate=" << yaw_rate << endl;
 	default_random_engine gen;
 
-	// because the particle may occur multiple times, we store the particle's normal_distribution generator
-	// in this way, we don't need to predict the nx, ny, ntheta again
-	map<int, vector<normal_distribution<double>>> particle_seen;
-
 	for (int i = 0; i < num_particles; i++)
 	{
 		Particle &p = particles[i]; // !!! USE reference please
@@ -70,41 +66,27 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 
 		normal_distribution<double> dist_nx, dist_ny, dist_ntheta;
 
-		// check have seen the id or not
-		if (particle_seen.find(p.id) != particle_seen.end())
+		double nx, ny, ntheta;
+
+		if (yaw_rate != 0)
 		{
-			cout << "have seen this particle before: " << p.id << endl;
-			dist_nx = particle_seen[p.id][0];
-			dist_ny = particle_seen[p.id][1];
-			dist_ntheta = particle_seen[p.id][2];
+			nx = p.x + velocity * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta)) / yaw_rate;
+			ny = p.y + velocity * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t)) / yaw_rate;
+			ntheta = p.theta + yaw_rate * delta_t;
 		}
 		else
 		{
-			double nx, ny, ntheta;
-
-			if (yaw_rate != 0)
-			{
-				nx = p.x + velocity * (sin(p.theta + yaw_rate * delta_t) - sin(p.theta)) / yaw_rate;
-				ny = p.y + velocity * (cos(p.theta) - cos(p.theta + yaw_rate * delta_t)) / yaw_rate;
-				ntheta = p.theta + yaw_rate * delta_t;
-			}
-			else
-			{
-				cout << "yaw_rate == 0" << endl;
-				nx = p.x + velocity * delta_t * cos(p.theta);
-				ny = p.y + velocity * delta_t * sin(p.theta);
-				ntheta = p.theta;
-			}
-
-			cout << "prediction output <" << p.id << ">" << nx << " " << ny << " " << ntheta << endl;
-
-			dist_nx = normal_distribution<double>(nx, std_pos[0]);
-			dist_ny = normal_distribution<double>(ny, std_pos[1]);
-			dist_ntheta = normal_distribution<double>(ntheta, std_pos[2]);
-
-			cout << "first particle with this id.. stored the nd for future use" << endl;
-			particle_seen[p.id] = {dist_nx, dist_ny, dist_ntheta};
+			cout << "yaw_rate == 0" << endl;
+			nx = p.x + velocity * delta_t * cos(p.theta);
+			ny = p.y + velocity * delta_t * sin(p.theta);
+			ntheta = p.theta;
 		}
+
+		cout << "prediction output <" << p.id << ">" << nx << " " << ny << " " << ntheta << endl;
+
+		dist_nx = normal_distribution<double>(nx, std_pos[0]);
+		dist_ny = normal_distribution<double>(ny, std_pos[1]);
+		dist_ntheta = normal_distribution<double>(ntheta, std_pos[2]);
 
 		p.x = dist_nx(gen);
 		p.y = dist_ny(gen);
