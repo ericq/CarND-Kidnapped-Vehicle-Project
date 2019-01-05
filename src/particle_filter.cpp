@@ -28,9 +28,10 @@ void ParticleFilter::init(double x, double y, double theta, double std[])
 	// Add random Gaussian noise to each particle.
 	// NOTE: Consult particle_filter.h for more information about this method (and others in this file).
 
-	num_particles = 20;
+	num_particles = 40;
 
 	default_random_engine gen;
+
 	normal_distribution<double> dist_x(x, std[0]);
 	normal_distribution<double> dist_y(y, std[1]);
 	normal_distribution<double> dist_theta(theta, std[2]);
@@ -54,15 +55,17 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
-	cout << "entering prediction.. delta_t=" << delta_t << " std_pos=" << std_pos[0] << "," << std_pos[1]
-		 << " velocity=" << velocity << " yaw_rate=" << yaw_rate << endl;
+	// cout << "entering prediction.. delta_t=" << delta_t << " std_pos=" << std_pos[0] << "," << std_pos[1]
+	// 	 << " velocity=" << velocity << " yaw_rate=" << yaw_rate << endl;
+
 	default_random_engine gen;
 
 	for (int i = 0; i < num_particles; i++)
 	{
+
 		Particle &p = particles[i]; // !!! USE reference please
 
-		cout << "prediction input <" << p.id << ">" << p.x << " " << p.y << " " << p.theta << endl;
+		//cout << "prediction input <" << p.id << ">" << p.x << " " << p.y << " " << p.theta << endl;
 
 		normal_distribution<double> dist_nx, dist_ny, dist_ntheta;
 
@@ -82,7 +85,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 			ntheta = p.theta;
 		}
 
-		cout << "prediction output <" << p.id << ">" << nx << " " << ny << " " << ntheta << endl;
+		//cout << "prediction output <" << p.id << ">" << nx << " " << ny << " " << ntheta << endl;
 
 		dist_nx = normal_distribution<double>(nx, std_pos[0]);
 		dist_ny = normal_distribution<double>(ny, std_pos[1]);
@@ -92,7 +95,7 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		p.y = dist_ny(gen);
 		p.theta = dist_ntheta(gen);
 
-		cout << "prediction with normal_dist:" << p.id << ">" << p.x << " " << p.y << " " << p.theta << endl;
+		//cout << "prediction with normal_dist:" << p.id << ">" << p.x << " " << p.y << " " << p.theta << endl;
 	}
 }
 
@@ -120,21 +123,13 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 
-	cout << "entering updateWeights.. " << endl;
-
-	cout << "print observations: size=" << observations.size() << endl;
-	for (auto ob : observations)
-	{
-		cout << ob.id << " " << ob.x << " " << ob.y << endl;
-	}
+	//cout << "entering updateWeights.. " << endl;
 
 	// for convenience - put map into a "map" data structure, key = landmark id
-	cout << "map size = " << map_landmarks.landmark_list.size() << endl;
 	map<int, Map::single_landmark_s> conv_map;
 	for (auto lm : map_landmarks.landmark_list)
 	{
 		conv_map[lm.id_i] = lm;
-		//cout << lm.id_i << " " << lm.x_f << " " << lm.y_f << endl;
 	}
 
 	// clear the weigths if it's not empty
@@ -142,7 +137,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 
 	for (auto p : particles)
 	{
-		cout << " start particle processing: " << p.id << endl;
+		//cout << " start particle processing: " << p.id << endl;
 		vector<LandmarkObs> predicted;
 		vector<LandmarkObs> observations_cp = observations;
 
@@ -206,15 +201,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			assoc_x.push_back(x_m);
 			assoc_y.push_back(y_m);
 		}
-		//SetAssociations(p, assoc, assoc_x, assoc_y);
-
-		// debugging
-		cout << "shortest dist to landmarks for all observations: ";
-		for (auto sd : shortest_dist_lm)
-		{
-			cout << sd << " ";
-		}
-		cout << endl;
 
 		// update weights
 		double total_weight = 1.0; // use 1.0 not 0.0 because it will be a production, not addition
@@ -238,22 +224,13 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			//calculate weight using normalization terms and exponent
 			double weight = gauss_norm * exp(-exponent);
 
-			if (true)
-			{
-				//cout << "gauss_norm = " << gauss_norm << " exponent=" << exponent << " weight=" << weight << endl;
-
-				//cout << sig_x << " " << sig_y << " " << x_obs << " " << y_obs << " " << mu_x << " " << mu_y << endl;
-
-				//assert(false);
-			}
-
 			// update total weight
 			total_weight *= weight;
 		}
 
 		p.weight = total_weight;
 		weights.push_back(total_weight);
-		cout << "total weight:" << total_weight << endl;
+		//cout << "total weight:" << total_weight << endl;
 	}
 
 	assert(weights.size() == num_particles);
@@ -265,24 +242,24 @@ void ParticleFilter::resample()
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
 
-	cout << "entering resample.. " << endl;
-	cout << "weights=";
-	for (auto w : weights)
-	{
-		cout << w << " ";
-	}
-	cout << endl;
+	// cout << "entering resample.. " << endl;
+	// cout << "weights=";
+	// for (auto w : weights)
+	// {
+	// 	cout << w << " ";
+	// }
+	// cout << endl;
 
 	random_device rd;
 	mt19937 gen(rd());
 	discrete_distribution<> dd(weights.begin(), weights.end());
 	vector<Particle> resampled;
 
-	cout << "start to pick: ";
+	//cout << "start to pick: ";
 	for (int i = 0; i < num_particles; i++)
 	{
 		int picked_pid = dd(gen);
-		cout << " " << picked_pid;
+		//cout << " " << picked_pid;
 		resampled.push_back(particles[picked_pid]);
 	}
 	cout << endl;
