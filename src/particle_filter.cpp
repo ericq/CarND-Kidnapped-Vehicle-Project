@@ -135,7 +135,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	// clear the weigths if it's not empty
 	weights.clear();
 
-	for (auto p : particles)
+	for (auto &p : particles)
 	{
 		//cout << " start particle processing: " << p.id << endl;
 		vector<LandmarkObs> predicted;
